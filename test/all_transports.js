@@ -199,7 +199,7 @@ module.exports = function allTransportTests(buildServer, buildClient) {
       function countDone(logKey, cb) {
         var allDone = after(max, cb);
         return through.obj(function(msg, enc, cb)  {
-          //console.log(logKey, msg)
+          console.log(logKey, msg)
           cb();
           allDone();
         });
@@ -208,13 +208,16 @@ module.exports = function allTransportTests(buildServer, buildClient) {
       intercept.pipe(writes);
       intercept.pipe(countDone('before-send', allDone));
 
-
       instance.pipe(through.obj(function(msg, enc, cb) {
-        msg.writes.pipe(msg.returnChannel);
+        msg.returnChannel.end(msg);
         cb();
       }));
 
-      returnChannel.pipe(countDone('echo', allDone));
+      returnChannel.pipe(through.obj(function(msg, enc, cb) {
+        console.log('back!!')
+        msg.writes.pipe(countDone('echo', allDone));
+        cb();
+      }));
 
       client.write({
         returnChannel: returnChannel,
