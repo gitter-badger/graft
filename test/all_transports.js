@@ -140,7 +140,7 @@ module.exports = function allTransportTests(buildServer, buildClient) {
     client.write({ hello: 'world' });
   });
 
-  it.skip('should support sending a Readable to the other side', function(done) {
+  it('should support sending a Readable to the other side', function(done) {
     var readable = new Readable();
 
     readable._read = function() {
@@ -194,27 +194,27 @@ module.exports = function allTransportTests(buildServer, buildClient) {
       var writes        = client.WriteChannel();
       var returnChannel = client.ReadChannel();
       var allDone       = after(2, done);
+      var intercept     = through.obj();
 
-      function countAllWrites(msg, enc, cb) {
-        msg.writes.pipe(countDone(allDone));
-        cb();
-      }
-
-      function countDone(cb) {
+      function countDone(logKey, cb) {
         var allDone = after(max, cb);
         return through.obj(function(msg, enc, cb)  {
+          //console.log(logKey, msg)
           cb();
           allDone();
         });
       }
 
+      intercept.pipe(writes);
+      intercept.pipe(countDone('before-send', allDone));
+
+
       instance.pipe(through.obj(function(msg, enc, cb) {
-        msg.returnChannel.write(msg);
+        msg.writes.pipe(msg.returnChannel);
         cb();
       }));
 
-      returnChannel.pipe(through.obj(countAllWrites));
-      client.pipe(through.obj(countAllWrites));
+      returnChannel.pipe(countDone('echo', allDone));
 
       client.write({
         returnChannel: returnChannel,
@@ -222,7 +222,7 @@ module.exports = function allTransportTests(buildServer, buildClient) {
       });
 
       for (var i = 0; i < max; i++) {
-        writes.write({ value : i });
+        intercept.write({ value : i });
       }
     });
   });
